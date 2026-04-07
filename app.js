@@ -30,6 +30,10 @@ const SERVICE_LOG_HEADERS = [
   "Last Name",
   "Email",
   "Phone Number",
+  "Address",
+  "City",
+  "State",
+  "Zip Code",
   "Appointment Date",
   "Appointment Time",
   "Notes",
@@ -82,6 +86,9 @@ function todayLocalISO() {
 /** Mon–Fri: 1:00 PM–8:00 PM. Sat–Sun: 10:00 AM–6:00 PM (local date). */
 const WEEKDAY_TIME = { min: "13:00", max: "20:00" };
 const WEEKEND_TIME = { min: "10:00", max: "18:00" };
+
+// Detail jobs typically take 2–4 hours. Use a conservative 4-hour block to prevent overlaps.
+const APPOINTMENT_BLOCK_MINUTES = 60 * 4;
 
 function parseISODateLocal(iso) {
   if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
@@ -147,6 +154,53 @@ function resetAppointmentTimeSelect(select) {
   ph.disabled = true;
   ph.selected = true;
   select.appendChild(ph);
+}
+
+function loadAppointments() {
+  try {
+    const raw = localStorage.getItem("dd_appointments");
+    const appts = raw ? JSON.parse(raw) : [];
+    return Array.isArray(appts) ? appts : [];
+  } catch {
+    return [];
+  }
+}
+
+function getRecordValue(record, header) {
+  if (!record) return "";
+  const direct = record[header];
+  if (direct != null) return String(direct).trim();
+  const target = normalizeHeader(header);
+  const foundKey = Object.keys(record).find((k) => normalizeHeader(k) === target);
+  return foundKey ? String(record[foundKey] ?? "").trim() : "";
+}
+
+function recordIsoDate(record) {
+  return getRecordValue(record, "Appointment Date");
+}
+
+function recordTime(record) {
+  return getRecordValue(record, "Appointment Time");
+}
+
+function timesOverlap(startA, durA, startB, durB) {
+  const a0 = timeStringToMinutes(startA);
+  const b0 = timeStringToMinutes(startB);
+  if (a0 == null || b0 == null) return false;
+  const a1 = a0 + durA;
+  const b1 = b0 + durB;
+  return a0 < b1 && b0 < a1;
+}
+
+function isSlotBlockedByExistingAppointments(isoDate, startTime, durationMins = APPOINTMENT_BLOCK_MINUTES) {
+  if (!isoDate || !startTime) return false;
+  const appts = loadAppointments();
+  return appts.some((a) => {
+    if (recordIsoDate(a) !== isoDate) return false;
+    const t = recordTime(a);
+    if (!t) return false;
+    return timesOverlap(startTime, durationMins, t, APPOINTMENT_BLOCK_MINUTES);
+  });
 }
 
 /** US phone: (XXX)XXX-XXXX as user types (max 10 digits). */
@@ -312,13 +366,14 @@ function syncAppointmentTimeWindow() {
   ph.disabled = true;
   timeInput.appendChild(ph);
   for (const t of slots) {
+    if (isSlotBlockedByExistingAppointments(iso, t)) continue;
     const opt = document.createElement("option");
     opt.value = t;
     opt.textContent = formatTimeSlotLabel(t);
     timeInput.appendChild(opt);
   }
   timeInput.disabled = false;
-  if (prev && slots.includes(prev)) timeInput.value = prev;
+  if (prev && slots.includes(prev) && !isSlotBlockedByExistingAppointments(iso, prev)) timeInput.value = prev;
   else timeInput.value = "";
 
   const dt = parseISODateLocal(iso);
@@ -397,7 +452,8 @@ function renderReviews() {
 }
 
 function loadYear() {
-  $("#year").textContent = new Date().getFullYear();
+  const el = $("#year");
+  if (el) el.textContent = new Date().getFullYear();
 }
 
 function wireTabs() {
@@ -409,6 +465,7 @@ function wireTabs() {
 function wireSchedulingForm() {
   const form = $("#schedule-form");
   const status = $("#schedule-status");
+  if (!form || !status) return;
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -462,11 +519,19 @@ function wireSchedulingForm() {
           : "Please choose a time between 1:00 PM and 8:00 PM on weekdays.";
         return;
       }
+
+      // Prevent double-booking overlaps on the same day (based on locally saved appointments).
+      if (isSlotBlockedByExistingAppointments(dateInput.value, timeInput.value)) {
+        status.textContent =
+          "That time is no longer available. Please pick a different time (appointments are spaced to avoid overlaps).";
+        syncAppointmentTimeWindow();
+        timeInput.focus();
+        return;
+      }
     }
 
     try {
-      const raw = localStorage.getItem("dd_appointments");
-      const appts = raw ? JSON.parse(raw) : [];
+      const appts = loadAppointments();
       appts.push({
         ...record,
         submittedAt: new Date().toISOString(),
@@ -513,6 +578,7 @@ function wireSchedulingForm() {
 function wireReviewForm() {
   const form = $("#review-form");
   const status = $("#review-status");
+  if (!form || !status) return;
 
   // Keep stars in sync with the selected radio.
   function syncRatingUI() {
