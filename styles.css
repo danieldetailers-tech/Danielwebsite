@@ -229,7 +229,8 @@ header.site-header{
   filter: saturate(1.05) contrast(1.03);
 }
 
-.panel-card h1{
+.panel-card h1,
+.panel-card h2{
   margin: 0 0 10px;
   color: var(--white);
 }
