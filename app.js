@@ -47,6 +47,10 @@ const SERVICE_LOG_HEADERS = [
 const EXCLUDED_HEADERS = new Set(["price", "tip", "total", "review"]);
 const APPOINTMENT_EMAIL_TO = "Sanabria.da07@gmail.com";
 
+// Customers cannot request appointments before this date (local date).
+// ISO format required: YYYY-MM-DD
+const APPOINTMENTS_OPEN_ISO = "2026-06-08";
+
 // --- Automatic email sending (EmailJS) ---
 // To enable: create an EmailJS account and fill in these three values.
 // - EMAILJS_PUBLIC_KEY: Account public key
@@ -106,6 +110,32 @@ function todayLocalISO() {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+
+function maxISODate(a, b) {
+  const aa = String(a || "").trim();
+  const bb = String(b || "").trim();
+  if (!aa) return bb;
+  if (!bb) return aa;
+  return aa > bb ? aa : bb;
+}
+
+function isISODateBefore(a, b) {
+  const aa = String(a || "").trim();
+  const bb = String(b || "").trim();
+  if (!aa || !bb) return false;
+  return aa < bb;
+}
+
+function collegeAvailabilityMessage() {
+  return `I’m currently in college. Appointments open starting ${formatDateMDY(APPOINTMENTS_OPEN_ISO)}.`;
+}
+
+function confirmationTextPopupMessage() {
+  return (
+    "Thanks! I’ll be contacting you through text message.\n\n" +
+    "Please keep an eye out for a message from a 626 phone number confirming your appointment."
+  );
 }
 
 /** Mon–Fri: 1:00 PM–8:00 PM. Sat–Sun: 10:00 AM–6:00 PM (local date). */
@@ -352,12 +382,12 @@ function buildSchedulingForm() {
       field.appendChild(input);
       field.appendChild(hint);
     } else if (type === "date") {
-      input.min = todayLocalISO();
+      input.min = maxISODate(todayLocalISO(), APPOINTMENTS_OPEN_ISO);
       input.title = "Open the calendar to choose your appointment day";
       input.setAttribute("aria-label", `${formatLabel(header)} — use the calendar to pick a day`);
       const hint = document.createElement("span");
       hint.className = "field-hint";
-      hint.textContent = "Click the field or calendar icon to choose a day.";
+      hint.textContent = `${collegeAvailabilityMessage()} Click the field or calendar icon to choose a day.`;
       field.appendChild(input);
       field.appendChild(hint);
     } else if (type === "tel") {
@@ -394,6 +424,13 @@ function syncAppointmentTimeWindow() {
       hint.textContent =
         "Select a date first, then choose a time. Mon–Fri 1:00–8:00 PM; Sat–Sun 10:00 AM–6:00 PM.";
     }
+    return;
+  }
+
+  if (isISODateBefore(iso, APPOINTMENTS_OPEN_ISO)) {
+    resetAppointmentTimeSelect(timeInput);
+    timeInput.disabled = true;
+    if (hint) hint.textContent = collegeAvailabilityMessage();
     return;
   }
 
@@ -558,6 +595,11 @@ function wireSchedulingForm() {
         status.textContent = "Please choose an appointment date.";
         return;
       }
+      if (isISODateBefore(dateInput.value, APPOINTMENTS_OPEN_ISO)) {
+        status.textContent = collegeAvailabilityMessage();
+        dateInput.focus();
+        return;
+      }
       const allowedSlots = getAllowedAppointmentSlotsForISODate(dateInput.value);
       if (allowedSlots == null) {
         status.textContent = "Please choose a valid appointment date.";
@@ -613,6 +655,7 @@ function wireSchedulingForm() {
           appointment_json: JSON.stringify(record, null, 2),
         });
         status.textContent = "Request received! Your appointment was emailed successfully.";
+        window.alert(confirmationTextPopupMessage());
         form.reset();
         syncAppointmentTimeWindow();
         return;
@@ -627,6 +670,7 @@ function wireSchedulingForm() {
     )}&body=${encodeURIComponent(body)}`;
     status.textContent =
       "Request received! We couldn’t send automatically, so an email draft will open with your appointment details.";
+    window.alert(confirmationTextPopupMessage());
     form.reset();
     syncAppointmentTimeWindow();
     window.location.href = mailto;
