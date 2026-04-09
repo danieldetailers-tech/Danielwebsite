@@ -1,4 +1,9 @@
-const $ = (sel) => document.querySelector(sel);
+// Railway is currently starting `app.js` under Node.
+// In Node there is no `document`, so we start the Express server instead.
+if (typeof document === "undefined") {
+  require("./server");
+} else {
+  const $ = (sel) => document.querySelector(sel);
 
 function setActiveTab(tabName) {
   document.querySelectorAll(".tab-button").forEach((btn) => {
@@ -643,5 +648,6 @@ function init() {
   }
 }
 
-init();
+  init();
+}
 
