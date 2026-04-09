@@ -71,9 +71,29 @@ function initEmailJsIfConfigured() {
   }
 }
 
+function formatTime12Hour(hhmm) {
+  const [h, m] = String(hhmm).split(":").map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return String(hhmm || "");
+  const d = new Date(2000, 0, 1, h, m, 0, 0);
+  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: true });
+}
+
+function formatDateMDY(isoYmd) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(isoYmd || "").trim());
+  if (!m) return String(isoYmd || "");
+  const yyyy = m[1];
+  const mm = m[2];
+  const dd = m[3];
+  return `${mm}-${dd}-${yyyy}`;
+}
+
 function buildAppointmentEmail(record) {
   const subject = "New Appointment Request — Daniel’s Detailers";
-  const lines = Object.entries(record).map(([k, v]) => `${k}: ${v}`);
+  const lines = Object.entries(record).map(([k, v]) => {
+    if (normalizeHeader(k) === "appointment time") return `${k}: ${formatTime12Hour(v)}`;
+    if (normalizeHeader(k) === "appointment date") return `${k}: ${formatDateMDY(v)}`;
+    return `${k}: ${v}`;
+  });
   const body =
     `New appointment request received.\n\n${lines.join("\n")}\n\nSubmitted at: ${new Date().toLocaleString()}\n\n` +
     "Note: Customers do not pay when scheduling; payment is due after service completion on the scheduled day.";
@@ -107,6 +127,29 @@ function getTimeWindowForISODate(iso) {
   const dow = dt.getDay();
   const isWeekend = dow === 0 || dow === 6;
   return isWeekend ? WEEKEND_TIME : WEEKDAY_TIME;
+}
+
+function getAllowedAppointmentSlotsForISODate(iso) {
+  const dt = parseISODateLocal(iso);
+  if (!dt || Number.isNaN(dt.getTime())) return null;
+  const dow = dt.getDay(); // 0 Sun .. 6 Sat
+
+  // Block off Monday (1) and Tuesday (2) entirely.
+  if (dow === 1 || dow === 2) return [];
+
+  // Wednesday (3) through Friday (5): only 1:00 PM and 6:00 PM.
+  if (dow >= 3 && dow <= 5) return ["13:00", "18:00"];
+
+  // Sunday: no appointments.
+  if (dow === 0) return [];
+
+  // Saturday: only 10:00 AM, 2:30 PM, 6:00 PM.
+  if (dow === 6) return ["10:00", "14:30", "18:00"];
+
+  // Fallback (shouldn't happen): use window-based slots.
+  const win = getTimeWindowForISODate(iso);
+  if (!win) return null;
+  return buildQuarterHourSlotStrings(win.min, win.max);
 }
 
 function timeStringToMinutes(t) {
@@ -354,8 +397,8 @@ function syncAppointmentTimeWindow() {
     return;
   }
 
-  const win = getTimeWindowForISODate(iso);
-  if (!win) {
+  const slots = getAllowedAppointmentSlotsForISODate(iso);
+  if (slots == null) {
     resetAppointmentTimeSelect(timeInput);
     timeInput.disabled = true;
     if (hint) hint.textContent = "Choose a valid appointment date.";
@@ -363,7 +406,6 @@ function syncAppointmentTimeWindow() {
   }
 
   const prev = timeInput.value;
-  const slots = buildQuarterHourSlotStrings(win.min, win.max);
   timeInput.innerHTML = "";
   const ph = document.createElement("option");
   ph.value = "";
@@ -377,16 +419,25 @@ function syncAppointmentTimeWindow() {
     opt.textContent = formatTimeSlotLabel(t);
     timeInput.appendChild(opt);
   }
-  timeInput.disabled = false;
-  if (prev && slots.includes(prev) && !isSlotBlockedByExistingAppointments(iso, prev)) timeInput.value = prev;
+  timeInput.disabled = slots.length === 0;
+  if (
+    prev &&
+    slots.includes(prev) &&
+    !isSlotBlockedByExistingAppointments(iso, prev)
+  ) {
+    timeInput.value = prev;
+  }
   else timeInput.value = "";
 
   const dt = parseISODateLocal(iso);
-  const weekend = dt && [0, 6].includes(dt.getDay());
+  const dow = dt ? dt.getDay() : null;
+  const weekend = dow != null && [0, 6].includes(dow);
   if (hint) {
-    hint.textContent = weekend
-      ? "Weekend: 10:00 AM – 6:00 PM, every 15 minutes."
-      : "Weekday: 1:00 PM – 8:00 PM, every 15 minutes.";
+    if (dow === 1 || dow === 2) hint.textContent = "No appointments available Monday–Tuesday.";
+    else if (dow != null && dow >= 3 && dow <= 5) hint.textContent = "Wed–Fri: 1:00 PM or 6:00 PM.";
+    else if (dow === 6) hint.textContent = "Saturday: 10:00 AM, 2:30 PM, or 6:00 PM.";
+    else if (dow === 0) hint.textContent = "No appointments available on Sunday.";
+    else hint.textContent = "Choose a valid appointment date.";
   }
 }
 
@@ -503,25 +554,27 @@ function wireSchedulingForm() {
     const dateInput = form.querySelector('input[type="date"]');
     const timeInput = form.querySelector('[data-appointment-time="true"]');
     if (timeInput && dateInput) {
-      const win = getTimeWindowForISODate(dateInput.value);
       if (!dateInput.value) {
         status.textContent = "Please choose an appointment date.";
         return;
       }
-      if (!win) {
+      const allowedSlots = getAllowedAppointmentSlotsForISODate(dateInput.value);
+      if (allowedSlots == null) {
         status.textContent = "Please choose a valid appointment date.";
         return;
       }
       if (
         !timeInput.value ||
-        !isTimeWithinWindow(timeInput.value, win) ||
+        !allowedSlots.includes(timeInput.value) ||
         !isQuarterHourTime(timeInput.value)
       ) {
         const dt = parseISODateLocal(dateInput.value);
-        const isWeekend = dt && [0, 6].includes(dt.getDay());
-        status.textContent = isWeekend
-          ? "Please choose a time between 10:00 AM and 6:00 PM for weekends."
-          : "Please choose a time between 1:00 PM and 8:00 PM on weekdays.";
+        const dow = dt ? dt.getDay() : null;
+        if (dow === 1 || dow === 2) status.textContent = "No appointments are available on Monday or Tuesday.";
+        else if (dow != null && dow >= 3 && dow <= 5) status.textContent = "Please choose 1:00 PM or 6:00 PM (Wed–Fri).";
+        else if (dow === 6) status.textContent = "Please choose 10:00 AM, 2:30 PM, or 6:00 PM (Saturday).";
+        else if (dow === 0) status.textContent = "No appointments are available on Sunday.";
+        else status.textContent = "Please choose a valid appointment date/time.";
         return;
       }
 
