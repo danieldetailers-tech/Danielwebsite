@@ -515,9 +515,40 @@ function saveReviews(reviews) {
   localStorage.setItem("dd_reviews", JSON.stringify(reviews));
 }
 
-function renderReviews() {
+async function fetchReviewsFromServer() {
+  try {
+    const res = await fetch("/api/reviews", { headers: { Accept: "application/json" } });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const reviews = data && Array.isArray(data.reviews) ? data.reviews : null;
+    return reviews;
+  } catch {
+    return null;
+  }
+}
+
+async function postReviewToServer(review) {
+  const res = await fetch("/api/reviews", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(review),
+  });
+  if (!res.ok) {
+    let msg = "Failed to save review.";
+    try {
+      const data = await res.json();
+      if (data && typeof data.error === "string") msg = data.error;
+    } catch {
+      // ignore
+    }
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+async function renderReviews() {
   const list = $("#reviews-list");
-  const reviews = loadReviews();
+  const reviews = (await fetchReviewsFromServer()) ?? loadReviews();
   list.innerHTML = "";
 
   if (reviews.length === 0) {
@@ -696,7 +727,7 @@ function wireReviewForm() {
     input.addEventListener("change", syncRatingUI);
   });
 
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
     const fd = new FormData(form);
@@ -710,18 +741,30 @@ function wireReviewForm() {
       return;
     }
 
-    const reviews = loadReviews();
-    reviews.push({ firstName, lastName, rating, comment, createdAt: new Date().toISOString() });
-    saveReviews(reviews);
+    status.textContent = "Posting review…";
+    const review = { firstName, lastName, rating, comment };
 
-    status.textContent = "Review posted. Thank you!";
-    form.reset();
-    renderReviews();
-    syncRatingUI();
+    try {
+      await postReviewToServer(review);
+      status.textContent = "Review posted. Thank you!";
+      form.reset();
+      await renderReviews();
+      syncRatingUI();
+      return;
+    } catch (err) {
+      // Fall back to local-only storage if the server is unavailable.
+      const reviews = loadReviews();
+      reviews.push({ ...review, createdAt: new Date().toISOString() });
+      saveReviews(reviews);
+      status.textContent = "Review posted. Thank you!";
+      form.reset();
+      await renderReviews();
+      syncRatingUI();
+    }
   });
 }
 
-function init() {
+async function init() {
   loadYear();
   wireTabs();
   initEmailJsIfConfigured();
@@ -729,7 +772,7 @@ function init() {
   wirePhoneMasks();
   wireAppointmentAvailability();
   wireSchedulingForm();
-  renderReviews();
+  await renderReviews();
   wireReviewForm();
 
   // Initial star state (if a user navigates back and the browser restores values).
