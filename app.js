@@ -159,6 +159,7 @@ function getTimeWindowForISODate(iso) {
   return isWeekend ? WEEKEND_TIME : WEEKDAY_TIME;
 }
 
+// NOTE: Update the available booking times here (Sun=0 ... Sat=6).
 function getAllowedAppointmentSlotsForISODate(iso) {
   const dt = parseISODateLocal(iso);
   if (!dt || Number.isNaN(dt.getTime())) return null;
