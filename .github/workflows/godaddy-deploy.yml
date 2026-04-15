@@ -1,0 +1,40 @@
+name: Deploy to GoDaddy (FTP/FTPS)
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch: {}
+
+concurrency:
+  group: godaddy-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Upload the repository to your GoDaddy hosting via FTP or FTPS.
+      # Works best for static sites or simple Node apps hosted via cPanel.
+      - name: Deploy via FTP/FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.GODADDY_FTP_SERVER }}
+          username: ${{ secrets.GODADDY_FTP_USERNAME }}
+          password: ${{ secrets.GODADDY_FTP_PASSWORD }}
+          port: ${{ secrets.GODADDY_FTP_PORT }}
+          protocol: ${{ secrets.GODADDY_FTP_PROTOCOL }}
+          server-dir: ${{ secrets.GODADDY_FTP_REMOTE_DIR }}
+          local-dir: ./
+          # Safety: don't upload dev/git artifacts
+          exclude: |
+            **/.git*
+            **/.github/**
+            **/node_modules/**
+            **/.DS_Store
+            **/*.log
+            **/terminals/**
+            **/agent-transcripts/**
+
