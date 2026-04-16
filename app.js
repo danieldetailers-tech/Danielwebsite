@@ -245,6 +245,53 @@ function loadAppointments() {
   }
 }
 
+async function fetchBookedTimesFromServer(isoDate) {
+  if (!isoDate) return null;
+  try {
+    const res = await fetch(`/api/appointments/booked?date=${encodeURIComponent(isoDate)}`, {
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const times = data && Array.isArray(data.bookedTimes) ? data.bookedTimes : null;
+    return times;
+  } catch {
+    return null;
+  }
+}
+
+async function reserveAppointmentSlotOnServer({ isoDate, time, record }) {
+  const body = {
+    date: isoDate,
+    time,
+    firstName: getRecordValue(record, "First Name"),
+    lastName: getRecordValue(record, "Last Name"),
+    phone: getRecordValue(record, "Phone Number"),
+    email: getRecordValue(record, "Email"),
+    notes: getRecordValue(record, "Notes"),
+  };
+
+  const res = await fetch("/api/appointments/reserve", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    let msg = "That time is no longer available. Please pick another time.";
+    try {
+      const data = await res.json();
+      if (data && typeof data.error === "string") msg = data.error;
+    } catch {
+      // ignore
+    }
+    const err = new Error(msg);
+    err.status = res.status;
+    throw err;
+  }
+  return res.json();
+}
+
 function getRecordValue(record, header) {
   if (!record) return "";
   const direct = record[header];
@@ -408,7 +455,7 @@ function buildSchedulingForm() {
   });
 }
 
-function syncAppointmentTimeWindow() {
+async function syncAppointmentTimeWindow() {
   const form = $("#schedule-form");
   if (!form) return;
   const dateInput = form.querySelector('input[type="date"]');
@@ -443,6 +490,10 @@ function syncAppointmentTimeWindow() {
     return;
   }
 
+  // Pull booked times from the server so the slot disappears on all devices.
+  const serverBookedTimes = (await fetchBookedTimesFromServer(iso)) || [];
+  const serverBooked = new Set(serverBookedTimes);
+
   const prev = timeInput.value;
   timeInput.innerHTML = "";
   const ph = document.createElement("option");
@@ -451,6 +502,7 @@ function syncAppointmentTimeWindow() {
   ph.disabled = true;
   timeInput.appendChild(ph);
   for (const t of slots) {
+    if (serverBooked.has(t)) continue;
     if (isSlotBlockedByExistingAppointments(iso, t)) continue;
     const opt = document.createElement("option");
     opt.value = t;
@@ -461,6 +513,7 @@ function syncAppointmentTimeWindow() {
   if (
     prev &&
     slots.includes(prev) &&
+    !serverBooked.has(prev) &&
     !isSlotBlockedByExistingAppointments(iso, prev)
   ) {
     timeInput.value = prev;
@@ -484,8 +537,8 @@ function wireAppointmentAvailability() {
   if (!form) return;
   const dateInput = form.querySelector('input[type="date"]');
   if (dateInput) {
-    dateInput.addEventListener("change", syncAppointmentTimeWindow);
-    dateInput.addEventListener("input", syncAppointmentTimeWindow);
+    dateInput.addEventListener("change", () => syncAppointmentTimeWindow());
+    dateInput.addEventListener("input", () => syncAppointmentTimeWindow());
   }
   syncAppointmentTimeWindow();
 }
@@ -622,6 +675,8 @@ function wireSchedulingForm() {
 
     const dateInput = form.querySelector('input[type="date"]');
     const timeInput = form.querySelector('[data-appointment-time="true"]');
+    let isoDate = "";
+    let apptTime = "";
     if (timeInput && dateInput) {
       if (!dateInput.value) {
         status.textContent = "Please choose an appointment date.";
@@ -652,13 +707,30 @@ function wireSchedulingForm() {
         return;
       }
 
-      // Prevent double-booking overlaps on the same day (based on locally saved appointments).
-      if (isSlotBlockedByExistingAppointments(dateInput.value, timeInput.value)) {
-        status.textContent =
-          "That time is no longer available. Please pick a different time (appointments are spaced to avoid overlaps).";
-        syncAppointmentTimeWindow();
-        timeInput.focus();
-        return;
+      isoDate = dateInput.value;
+      apptTime = timeInput.value;
+
+      // First-choice: reserve the slot on the server so it disappears for everyone.
+      // If the server isn't available, fall back to local-only behavior.
+      try {
+        status.textContent = "Reserving your time slot…";
+        await reserveAppointmentSlotOnServer({ isoDate, time: apptTime, record });
+      } catch (err) {
+        if (err && (err.status === 409 || err.status === 400)) {
+          status.textContent = err.message || "That time is no longer available. Please choose another time.";
+          await syncAppointmentTimeWindow();
+          timeInput.focus();
+          return;
+        }
+
+        // Fallback: prevent double-booking overlaps on the same day (local-only).
+        if (isSlotBlockedByExistingAppointments(isoDate, apptTime)) {
+          status.textContent =
+            "That time is no longer available. Please pick a different time (appointments are spaced to avoid overlaps).";
+          await syncAppointmentTimeWindow();
+          timeInput.focus();
+          return;
+        }
       }
     }
 
