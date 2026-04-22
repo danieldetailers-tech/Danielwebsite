@@ -4,7 +4,8 @@
   "description": "Daniel’s Detailers website",
   "private": true,
   "scripts": {
-    "test": "echo \"No tests\" && exit 0"
+    "build": "node -e \"console.log('Static site (no build step)')\"",
+    "test": "node -e \"console.log('No tests')\""
   },
   "repository": {
     "type": "git",
