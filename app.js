@@ -1,8 +1,6 @@
-// Railway is currently starting `app.js` under Node.
-// In Node there is no `document`, so we start the Express server instead.
-if (typeof document === "undefined") {
-  require("./server");
-} else {
+// This script is intended to run in the browser (static hosting, Cloudflare Pages, etc.)
+// The backend endpoints it calls (e.g. /api/reviews) are implemented separately.
+{
   const $ = (sel) => document.querySelector(sel);
 
 function setActiveTab(tabName) {

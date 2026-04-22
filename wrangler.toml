@@ -1,0 +1,10 @@
+name = "daniels-detailers"
+compatibility_date = "2026-04-22"
+
+# For local dev with `wrangler pages dev` and D1 migrations.
+[d1_databases]
+DB = { binding = "DB", database_name = "daniels_detailers", database_id = "REPLACE_ME" }
+
+[migrations]
+dir = "migrations"
+
