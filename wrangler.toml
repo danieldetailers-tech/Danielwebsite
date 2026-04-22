@@ -5,10 +5,12 @@ compatibility_date = "2026-04-22"
 [observability]
 enabled = false
 
-# For local dev with `wrangler pages dev` and D1 migrations.
-[d1_databases]
-DB = { binding = "DB", database_name = "daniels_detailers", database_id = "REPLACE_ME" }
+# D1 migrations live here (Wrangler v4).
+migrations_dir = "migrations"
 
-[migrations]
-dir = "migrations"
+# D1 database binding (Wrangler v4 expects an array).
+[[d1_databases]]
+binding = "DB"
+database_name = "daniels_detailers"
+database_id = "REPLACE_ME"
 
