@@ -1,4 +1,4 @@
-import { clampStr, json } from "../_utils";
+import { clampStr, json } from "../_utils.js";
 
 export async function onRequestGet(context) {
   try {

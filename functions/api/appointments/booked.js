@@ -1,4 +1,4 @@
-import { isIsoDate, json } from "../../_utils";
+import { isIsoDate, json } from "../../_utils.js";
 
 export async function onRequestGet(context) {
   try {
