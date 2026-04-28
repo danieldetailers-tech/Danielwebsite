@@ -160,14 +160,57 @@
         <div class="grid-2">
           <div class="panel-card">
             <h2>Leave a Review</h2>
-            <p class="lead">This page is still under construction.</p>
-            <p class="muted">Reviews can’t be entered at this moment. Please check back soon.</p>
+            <p class="muted">Share how your detailing turned out—your review helps other customers.</p>
+
+            <form id="review-form" class="form" autocomplete="on">
+              <div class="form-grid">
+                <label class="field">
+                  <span class="field-label">First name</span>
+                  <input name="firstName" type="text" maxlength="50" required />
+                </label>
+
+                <label class="field">
+                  <span class="field-label">Last name</span>
+                  <input name="lastName" type="text" maxlength="50" required />
+                </label>
+
+                <div class="field field-full">
+                  <span class="field-label">Rating</span>
+                  <div class="rating" role="radiogroup" aria-label="Rating">
+                    <input id="star-1" type="radio" name="rating" value="1" required />
+                    <label class="rating-star" for="star-1" aria-label="1 star">★</label>
+
+                    <input id="star-2" type="radio" name="rating" value="2" />
+                    <label class="rating-star" for="star-2" aria-label="2 stars">★</label>
+
+                    <input id="star-3" type="radio" name="rating" value="3" />
+                    <label class="rating-star" for="star-3" aria-label="3 stars">★</label>
+
+                    <input id="star-4" type="radio" name="rating" value="4" />
+                    <label class="rating-star" for="star-4" aria-label="4 stars">★</label>
+
+                    <input id="star-5" type="radio" name="rating" value="5" />
+                    <label class="rating-star" for="star-5" aria-label="5 stars">★</label>
+                  </div>
+                </div>
+
+                <label class="field field-full">
+                  <span class="field-label">Comment</span>
+                  <textarea name="comment" rows="4" maxlength="800" required></textarea>
+                </label>
+              </div>
+
+              <div class="form-actions">
+                <button class="btn btn-primary" type="submit">Post review</button>
+                <div id="review-status" class="form-status" role="status" aria-live="polite"></div>
+              </div>
+            </form>
           </div>
 
           <div class="panel-card">
             <h2>Customer Reviews</h2>
             <div id="reviews-list" class="reviews-list" aria-live="polite">
-              <div class="muted">Under construction — customer reviews will appear here soon.</div>
+              <div class="muted">Loading reviews…</div>
             </div>
           </div>
         </div>
