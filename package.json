@@ -18,5 +18,8 @@
     "url": "https://github.com/danieldetailers-tech/Danielwebsite/issues"
   },
   "homepage": "https://github.com/danieldetailers-tech/Danielwebsite#readme",
-  "type": "module"
+  "type": "module",
+  "devDependencies": {
+    "wrangler": "^4.84.1"
+  }
 }

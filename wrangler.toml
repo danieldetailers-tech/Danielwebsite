@@ -1,16 +1,20 @@
-name = "danielwebsite"
+name = "reviews"
 compatibility_date = "2026-04-22"
 
 # Keep Cloudflare deployment settings consistent.
 [observability]
 enabled = false
 
-# D1 migrations live here (Wrangler v4).
-migrations_dir = "migrations"
-
-# D1 database binding (Wrangler v4 expects an array).
+# Reviews + legacy combined schema
 [[d1_databases]]
 binding = "DB"
 database_name = "daniels_detailers"
-database_id = "REPLACE_ME"
+database_id = "d8cefc0f-1f87-4fe5-a6a2-11b0c77ad607"
+migrations_dir = "migrations"
 
+# Scheduling (create DB in Cloudflare, then set database_id)
+[[d1_databases]]
+binding = "SCHEDULING"
+database_name = "daniels_scheduling"
+database_id = "75a59b37-a80b-4295-b046-4b17e51d8a12"
+migrations_dir = "migrations/scheduling"

@@ -8,6 +8,10 @@ function isUniqueConstraintError(err) {
 
 export async function onRequestPost(context) {
   try {
+    if (!context?.env?.SCHEDULING) {
+      return json({ ok: false, error: "Scheduling database binding (SCHEDULING) is not configured." }, { status: 500 });
+    }
+
     const body = await context.request.json().catch(() => null);
 
     const isoDate = String(body?.date || "").trim();
@@ -25,7 +29,7 @@ export async function onRequestPost(context) {
     const notes = clampStr(body?.notes, 400);
 
     try {
-      const info = await context.env.DB.prepare(
+      const info = await context.env.SCHEDULING.prepare(
         `INSERT INTO appointment_reservations
          (isoDate, time, createdAt, clientFirstName, clientLastName, clientPhone, clientEmail, notes)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
