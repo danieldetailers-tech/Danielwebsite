@@ -243,10 +243,21 @@ function loadAppointments() {
   }
 }
 
+// Option B (GoDaddy site + Cloudflare Worker API):
+// Set this to your Worker URL after deploying, e.g. "https://daniels-detailers-api.<you>.workers.dev"
+// or your custom API domain like "https://api.yourdomain.com".
+const API_BASE = "";
+
+function apiUrl(path) {
+  const base = String(API_BASE || "").trim().replace(/\/+$/, "");
+  if (!base) return path; // same-origin (Cloudflare Pages)
+  return `${base}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
 async function fetchBookedTimesFromServer(isoDate) {
   if (!isoDate) return null;
   try {
-    const res = await fetch(`/api/appointments/booked?date=${encodeURIComponent(isoDate)}`, {
+    const res = await fetch(`${apiUrl("/api/appointments/booked")}?date=${encodeURIComponent(isoDate)}`, {
       headers: { Accept: "application/json" },
     });
     if (!res.ok) return null;
@@ -269,7 +280,7 @@ async function reserveAppointmentSlotOnServer({ isoDate, time, record }) {
     notes: getRecordValue(record, "Notes"),
   };
 
-  const res = await fetch("/api/appointments/reserve", {
+  const res = await fetch(apiUrl("/api/appointments/reserve"), {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify(body),
@@ -569,7 +580,7 @@ function saveReviews(reviews) {
 
 async function fetchReviewsFromServer() {
   try {
-    const res = await fetch("/api/reviews", { headers: { Accept: "application/json" } });
+    const res = await fetch(apiUrl("/api/reviews"), { headers: { Accept: "application/json" } });
     if (!res.ok) return null;
     const data = await res.json();
     const reviews = data && Array.isArray(data.reviews) ? data.reviews : null;
@@ -580,7 +591,7 @@ async function fetchReviewsFromServer() {
 }
 
 async function postReviewToServer(review) {
-  const res = await fetch("/api/reviews", {
+  const res = await fetch(apiUrl("/api/reviews"), {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify(review),

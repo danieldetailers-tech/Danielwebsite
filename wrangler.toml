@@ -1,5 +1,8 @@
-name = "reviews"
+name = "daniels-detailers-api"
 compatibility_date = "2026-04-22"
+
+# Worker entrypoint (Option B: GoDaddy site + Cloudflare Worker API)
+main = "src/worker.js"
 
 # Keep Cloudflare deployment settings consistent.
 [observability]
