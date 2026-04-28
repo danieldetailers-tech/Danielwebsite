@@ -246,7 +246,7 @@ function loadAppointments() {
 // Option B (GoDaddy site + Cloudflare Worker API):
 // Set this to your Worker URL after deploying, e.g. "https://daniels-detailers-api.<you>.workers.dev"
 // or your custom API domain like "https://api.yourdomain.com".
-const API_BASE = "";
+const API_BASE = "https://daniels-detailers-api.danieldetailers.workers.dev";
 
 function apiUrl(path) {
   const base = String(API_BASE || "").trim().replace(/\/+$/, "");
