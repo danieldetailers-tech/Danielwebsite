@@ -61,18 +61,33 @@
       list.innerHTML = '<div class="review-card"><div class="review-text">No appointments for this date.</div></div>';
       return;
     }
+    function formatTime12Hour(hhmm) {
+      const [h, m] = String(hhmm || "").split(":").map(Number);
+      if (!Number.isFinite(h) || !Number.isFinite(m)) return String(hhmm || "");
+      const d = new Date(2000, 0, 1, h, m, 0, 0);
+      return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: true });
+    }
+
+    function formatDateMDY(isoDate) {
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(isoDate || "").trim());
+      if (!m) return String(isoDate || "");
+      return `${m[2]}-${m[3]}-${m[1]}`;
+    }
+
     items.forEach((a) => {
+      const firstName = String(a.clientFirstName || "").trim();
+      const lastName = String(a.clientLastName || "").trim();
+      const customerName = [firstName, lastName].filter(Boolean).join(" ") || "N/A";
       const card = document.createElement("div");
       card.className = "review-card";
       card.innerHTML = `
         <div class="review-meta">
-          <div class="review-name">${a.time} - ${a.clientFirstName || ""} ${a.clientLastName || ""}</div>
+          <div class="review-name">${formatTime12Hour(a.time)} - ${customerName}</div>
           <button class="btn admin-cancel-btn" type="button" data-id="${a.id}">Cancel</button>
         </div>
         <div class="review-text">
-          Phone: ${a.clientPhone || "n/a"}<br/>
-          Email: ${a.clientEmail || "n/a"}<br/>
-          Notes: ${a.notes || "n/a"}
+          Date: ${formatDateMDY(a.isoDate)}<br/>
+          Phone: ${a.clientPhone || "N/A"}
         </div>
       `;
       list.appendChild(card);
