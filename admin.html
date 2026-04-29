@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Admin | Daniel's Detailers</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container header-inner">
+        <div class="brand">
+          <img class="brand-logo" src="./assets/logo.png" alt="Daniel's Detailers" width="160" height="160" />
+          <div class="brand-copy">
+            <div class="brand-tagline">Admin Scheduling Dashboard</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="tab-panel is-active">
+        <div class="panel-card">
+          <h1>Admin Login</h1>
+          <form id="admin-login-form" class="form" autocomplete="off">
+            <div class="form-grid">
+              <label class="field field-full">
+                <span class="field-label">Admin password</span>
+                <input id="admin-password" type="password" required />
+              </label>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary" type="submit">Log in</button>
+              <div id="admin-login-status" class="form-status" role="status" aria-live="polite"></div>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section id="admin-dashboard" class="tab-panel is-active admin-hidden">
+        <div class="panel-card">
+          <div class="admin-toolbar">
+            <h2>Appointment Manager</h2>
+            <button id="admin-logout-btn" class="btn" type="button">Log out</button>
+          </div>
+
+          <div class="form-grid admin-grid-2">
+            <label class="field">
+              <span class="field-label">Date</span>
+              <input id="admin-date" type="date" />
+            </label>
+            <div class="field">
+              <span class="field-label">Actions</span>
+              <button id="admin-refresh-btn" class="btn btn-primary" type="button">Load schedule</button>
+            </div>
+          </div>
+
+          <div id="admin-status" class="form-status" role="status" aria-live="polite"></div>
+
+          <div class="grid-2 admin-sections">
+            <div class="panel-card">
+              <h3>Booked Appointments</h3>
+              <div id="admin-appointments-list" class="reviews-list"></div>
+            </div>
+
+            <div class="panel-card">
+              <h3>Add Appointment</h3>
+              <form id="admin-add-form" class="form">
+                <div class="form-grid">
+                  <label class="field">
+                    <span class="field-label">Time (24h HH:MM)</span>
+                    <input name="time" type="time" required />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">First name</span>
+                    <input name="firstName" type="text" maxlength="50" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Last name</span>
+                    <input name="lastName" type="text" maxlength="50" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Phone</span>
+                    <input name="phone" type="text" maxlength="30" />
+                  </label>
+                  <label class="field field-full">
+                    <span class="field-label">Email</span>
+                    <input name="email" type="email" maxlength="120" />
+                  </label>
+                  <label class="field field-full">
+                    <span class="field-label">Notes</span>
+                    <textarea name="notes" rows="3" maxlength="400"></textarea>
+                  </label>
+                </div>
+                <div class="form-actions">
+                  <button class="btn btn-primary" type="submit">Add appointment</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div class="panel-card admin-override-card">
+            <h3>Override Slot Availability</h3>
+            <form id="admin-override-form" class="form">
+              <div class="form-grid admin-grid-3">
+                <label class="field">
+                  <span class="field-label">Time (24h HH:MM)</span>
+                  <input name="time" type="time" required />
+                </label>
+                <label class="field">
+                  <span class="field-label">Mode</span>
+                  <select name="mode">
+                    <option value="block">Block slot</option>
+                    <option value="open">Force open slot</option>
+                  </select>
+                </label>
+                <label class="field field-full">
+                  <span class="field-label">Note (optional)</span>
+                  <input name="note" type="text" maxlength="200" />
+                </label>
+              </div>
+              <div class="form-actions">
+                <button class="btn btn-primary" type="submit">Save override</button>
+              </div>
+            </form>
+            <div id="admin-overrides-list" class="reviews-list"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="./admin.js"></script>
+  </body>
+</html>

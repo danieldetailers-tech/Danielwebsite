@@ -452,3 +452,41 @@ input[type="time"]{
   padding-top: 6px;
 }
 
+.admin-hidden{
+  display: none !important;
+}
+
+.admin-toolbar{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-sections{
+  margin-top: 14px;
+}
+
+.admin-grid-2{
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-grid-3{
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admin-override-card{
+  margin-top: 14px;
+}
+
+.admin-cancel-btn{
+  padding: 8px 10px;
+}
+
+@media (max-width: 920px){
+  .admin-grid-2,
+  .admin-grid-3{
+    grid-template-columns: 1fr;
+  }
+}
+
