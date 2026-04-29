@@ -254,7 +254,7 @@ async function handleAdminAppointments(req, env) {
         `SELECT id, isoDate, time, createdAt, clientFirstName, clientLastName, clientPhone, clientEmail, notes
          FROM appointment_reservations
          WHERE isoDate = ?
-         ORDER BY time ASC, id ASC`,
+         ORDER BY isoDate ASC, time ASC, id ASC`,
       )
         .bind(isoDate)
         .all(),
@@ -262,7 +262,7 @@ async function handleAdminAppointments(req, env) {
         `SELECT id, isoDate, time, isAvailable, note, createdAt
          FROM appointment_availability_overrides
          WHERE isoDate = ?
-         ORDER BY time ASC, id ASC`,
+         ORDER BY isoDate ASC, time ASC, id ASC`,
       )
         .bind(isoDate)
         .all(),

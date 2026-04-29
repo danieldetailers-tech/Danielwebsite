@@ -83,24 +83,35 @@
       return `${m[2]}-${m[3]}-${m[1]}`;
     }
 
-    items.forEach((a) => {
-      const firstName = String(a.clientFirstName || "").trim();
-      const lastName = String(a.clientLastName || "").trim();
+    items
+      .slice()
+      .sort((a, b) => {
+        const da = String(a?.isoDate || "");
+        const db = String(b?.isoDate || "");
+        if (da !== db) return da < db ? -1 : 1;
+        const ta = String(a?.time || "");
+        const tb = String(b?.time || "");
+        if (ta !== tb) return ta < tb ? -1 : 1;
+        return Number(a?.id || 0) - Number(b?.id || 0);
+      })
+      .forEach((a) => {
+        const firstName = String(a.clientFirstName || "").trim();
+        const lastName = String(a.clientLastName || "").trim();
       const customerName = [firstName, lastName].filter(Boolean).join(" ") || "N/A";
       const card = document.createElement("div");
       card.className = "review-card";
       card.innerHTML = `
         <div class="review-meta">
-          <div class="review-name">${formatTime12Hour(a.time)} - ${customerName}</div>
+          <div class="review-name">${formatTime12Hour(a.time)} - ${escapeHtml(customerName)}</div>
           <button class="btn admin-cancel-btn" type="button" data-id="${a.id}">Cancel</button>
         </div>
         <div class="review-text">
           Date: ${formatDateMDY(a.isoDate)}<br/>
-          Phone: ${a.clientPhone || "N/A"}
+          Phone: ${escapeHtml(a.clientPhone || "N/A")}
         </div>
       `;
       list.appendChild(card);
-    });
+      });
   }
 
   function renderOverrides(items) {
