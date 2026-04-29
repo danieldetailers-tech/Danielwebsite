@@ -360,6 +360,24 @@ async function handleAdminAvailability(req, env) {
   return json({ ok: true, override: { isoDate, time, isAvailable, note, createdAt } }, { status: 200 });
 }
 
+async function handleAdminDeleteReview(req, env, id) {
+  const auth = await requireAdmin(req, env);
+  if (!auth.ok) return auth.response;
+  if (!env.DB) return json({ ok: false, error: "DB binding is not configured." }, { status: 500 });
+  if (req.method !== "DELETE") return json({ ok: false, error: "Method not allowed." }, { status: 405 });
+
+  const reviewId = Number(id);
+  if (!Number.isInteger(reviewId) || reviewId <= 0) {
+    return json({ ok: false, error: "Invalid review id." }, { status: 400 });
+  }
+
+  const info = await env.DB.prepare(`DELETE FROM reviews WHERE id = ?`).bind(reviewId).run();
+  if (!Number(info?.meta?.changes || 0)) {
+    return json({ ok: false, error: "Review not found." }, { status: 404 });
+  }
+  return json({ ok: true, deletedId: reviewId }, { status: 200 });
+}
+
 export default {
   async fetch(req, env) {
     try {
@@ -370,6 +388,7 @@ export default {
       const url = new URL(req.url);
       const path = url.pathname.replace(/\/+$/, "");
       const cancelMatch = /^\/api\/admin\/appointments\/(\d+)$/.exec(path);
+      const deleteReviewMatch = /^\/api\/admin\/reviews\/(\d+)$/.exec(path);
 
       let res;
       if (path === "/api/reviews") res = await handleReviews(req, env);
@@ -379,6 +398,7 @@ export default {
       else if (path === "/api/admin/appointments") res = await handleAdminAppointments(req, env);
       else if (cancelMatch) res = await handleAdminCancel(req, env, cancelMatch[1]);
       else if (path === "/api/admin/availability") res = await handleAdminAvailability(req, env);
+      else if (deleteReviewMatch) res = await handleAdminDeleteReview(req, env, deleteReviewMatch[1]);
       else res = json({ ok: false, error: "Not found." }, { status: 404 });
 
       return withCors(req, res);

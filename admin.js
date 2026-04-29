@@ -54,6 +54,15 @@
     $("#admin-status").textContent = message || "";
   }
 
+  function escapeHtml(str) {
+    return String(str ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
   function renderAppointments(items) {
     const list = $("#admin-appointments-list");
     list.innerHTML = "";
@@ -115,6 +124,48 @@
     });
   }
 
+  function renderReviews(items) {
+    const list = $("#admin-reviews-list");
+    if (!list) return;
+    list.innerHTML = "";
+    if (!Array.isArray(items) || items.length === 0) {
+      list.innerHTML = '<div class="review-card"><div class="review-text">No reviews yet.</div></div>';
+      return;
+    }
+
+    items
+      .slice()
+      .reverse()
+      .forEach((r) => {
+        const stars = "★".repeat(r.rating) + "☆".repeat(5 - r.rating);
+        const card = document.createElement("div");
+        card.className = "review-card";
+        card.innerHTML = `
+          <div class="review-meta">
+            <div class="review-name">${escapeHtml(r.firstName)} ${escapeHtml(r.lastName)}</div>
+            <div class="review-rating" aria-label="${Number(r.rating)} out of 5 stars">${stars}</div>
+            <button class="btn admin-review-delete-btn" type="button" data-id="${r.id}">Remove</button>
+          </div>
+          <div class="review-text">${escapeHtml(r.comment)}</div>
+        `;
+        list.appendChild(card);
+      });
+  }
+
+  async function loadReviews() {
+    const list = $("#admin-reviews-list");
+    if (!list) return;
+    list.innerHTML = '<div class="review-card"><div class="review-text">Loading reviews…</div></div>';
+    try {
+      const data = await apiFetch("/api/reviews");
+      renderReviews(data.reviews || []);
+      setStatus("Reviews loaded.");
+    } catch (err) {
+      renderReviews([]);
+      setStatus(err.message || "Failed to load reviews.");
+    }
+  }
+
   async function loadSchedule() {
     const date = $("#admin-date").value;
     if (!date) {
@@ -160,6 +211,8 @@
 
   function wireAdminActions() {
     $("#admin-refresh-btn").addEventListener("click", loadSchedule);
+    const refreshReviewsBtn = $("#admin-reviews-refresh-btn");
+    if (refreshReviewsBtn) refreshReviewsBtn.addEventListener("click", loadReviews);
     $("#admin-logout-btn").addEventListener("click", () => {
       setToken("");
       dashboardVisible(false);
@@ -234,6 +287,25 @@
         setStatus(err.message || "Override failed.");
       }
     });
+
+    const reviewsList = $("#admin-reviews-list");
+    if (reviewsList) {
+      reviewsList.addEventListener("click", async (e) => {
+        const btn = e.target.closest(".admin-review-delete-btn");
+        if (!btn) return;
+        const id = btn.getAttribute("data-id");
+        if (!id) return;
+        if (!window.confirm("Remove this review? This cannot be undone.")) return;
+        setStatus("Removing review...");
+        try {
+          await apiFetch(`/api/admin/reviews/${encodeURIComponent(id)}`, { method: "DELETE" });
+          await loadReviews();
+          setStatus("Review removed.");
+        } catch (err) {
+          setStatus(err.message || "Remove failed.");
+        }
+      });
+    }
   }
 
   function init() {
@@ -243,6 +315,7 @@
     if (getToken()) {
       dashboardVisible(true);
       loadSchedule();
+      loadReviews();
     }
   }
 
