@@ -475,6 +475,16 @@ input[type="time"]{
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.admin-date-actions .field{
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-date-actions .btn{
+  margin-top: auto;
+  width: 100%;
+}
+
 .admin-override-card{
   margin-top: 14px;
 }

@@ -40,6 +40,19 @@
 
       <section id="admin-dashboard" class="tab-panel is-active admin-hidden">
         <div class="panel-card">
+          <div class="form-grid admin-grid-2 admin-date-actions">
+            <label class="field">
+              <span class="field-label">Service date (detail day)</span>
+              <input id="admin-date" type="date" />
+            </label>
+            <div class="field">
+              <span class="field-label">Actions</span>
+              <button id="admin-refresh-btn" class="btn btn-primary" type="button">Load schedule</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-card">
           <div class="admin-toolbar">
             <h2>Appointment Manager</h2>
             <button id="admin-logout-btn" class="btn" type="button">Log out</button>
@@ -47,34 +60,10 @@
 
           <div id="admin-status" class="form-status" role="status" aria-live="polite"></div>
 
-          <div class="panel-card">
-            <h3>Next 3 upcoming appointments</h3>
-            <div id="admin-upcoming-appointments" class="reviews-list"></div>
-          </div>
-
           <div class="grid-2 admin-sections">
             <div class="panel-card">
-              <div class="admin-toolbar">
-                <h3>Appointments (all service days)</h3>
-                <button id="admin-appointments-refresh-btn" class="btn" type="button">Refresh</button>
-              </div>
-
-              <div class="form-grid">
-                <label class="field field-full">
-                  <span class="field-label">Search by client name</span>
-                  <input id="admin-appointments-search" type="text" placeholder="e.g. Daniel" />
-                </label>
-              </div>
-
-              <div id="admin-appointments-all-list" class="reviews-list"></div>
-
-              <div class="form-actions">
-                <div class="admin-toolbar">
-                  <button id="admin-appointments-prev" class="btn" type="button">Prev</button>
-                  <div id="admin-appointments-page" class="muted"></div>
-                  <button id="admin-appointments-next" class="btn" type="button">Next</button>
-                </div>
-              </div>
+              <h3>Booked Appointments</h3>
+              <div id="admin-appointments-list" class="reviews-list"></div>
             </div>
 
             <div class="panel-card">
@@ -113,23 +102,6 @@
             </div>
           </div>
 
-          <div class="panel-card">
-            <div class="admin-toolbar">
-              <h3>Service day tools (optional)</h3>
-              <button id="admin-refresh-btn" class="btn btn-primary" type="button">Load schedule</button>
-            </div>
-            <div class="form-grid admin-grid-2">
-              <label class="field">
-                <span class="field-label">Pick a service day</span>
-                <input id="admin-date" type="date" />
-              </label>
-              <div class="field">
-                <span class="field-label">What this does</span>
-                <div class="muted">Load a single day’s appointments and manage slot overrides.</div>
-              </div>
-            </div>
-          </div>
-
           <div class="panel-card admin-override-card">
             <h3>Override Slot Availability</h3>
             <form id="admin-override-form" class="form">
@@ -155,11 +127,6 @@
               </div>
             </form>
             <div id="admin-overrides-list" class="reviews-list"></div>
-          </div>
-
-          <div class="panel-card">
-            <h3>Appointments for selected service day</h3>
-            <div id="admin-appointments-list" class="reviews-list"></div>
           </div>
 
           <div class="panel-card">
