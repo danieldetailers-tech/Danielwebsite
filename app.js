@@ -45,9 +45,14 @@ const SERVICE_LOG_HEADERS = [
 const EXCLUDED_HEADERS = new Set(["price", "tip", "total", "review"]);
 const APPOINTMENT_EMAIL_TO = "Sanabria.da07@gmail.com";
 
-// Customers cannot request appointments before this date (local date).
-// ISO format required: YYYY-MM-DD
-const APPOINTMENTS_OPEN_ISO = "2026-06-08";
+// Appointment request windows (local date). ISO format required: YYYY-MM-DD
+// - Allowed through 2026-07-30
+// - Blocked 2026-07-31 .. 2027-05-24
+// - Allowed 2027-05-25 .. 2028-08-15
+const APPOINTMENT_WINDOWS = [
+  { start: "2026-06-08", end: "2026-07-30" },
+  { start: "2027-05-25", end: "2028-08-15" },
+];
 
 // --- Automatic email sending (EmailJS) ---
 // To enable: create an EmailJS account and fill in these three values.
@@ -125,8 +130,29 @@ function isISODateBefore(a, b) {
   return aa < bb;
 }
 
+function appointmentWindowsLabel() {
+  const parts = APPOINTMENT_WINDOWS.map((w) => `${formatDateMDY(w.start)}–${formatDateMDY(w.end)}`);
+  return parts.join(" and ");
+}
+
+function isISODateWithinAnyWindow(iso) {
+  const d = String(iso || "").trim();
+  if (!d) return false;
+  return APPOINTMENT_WINDOWS.some((w) => d >= w.start && d <= w.end);
+}
+
+function nextAvailableAppointmentStartOnOrAfter(iso) {
+  const d = String(iso || "").trim();
+  if (!d) return APPOINTMENT_WINDOWS[0]?.start || "";
+  if (isISODateWithinAnyWindow(d)) return d;
+  for (const w of APPOINTMENT_WINDOWS) {
+    if (d < w.start) return w.start;
+  }
+  return "";
+}
+
 function collegeAvailabilityMessage() {
-  return `I’m currently in college. Appointments open starting ${formatDateMDY(APPOINTMENTS_OPEN_ISO)}.`;
+  return "Appointments are available Wednesday–Saturday.";
 }
 
 function confirmationTextPopupMessage() {
@@ -428,18 +454,20 @@ function buildSchedulingForm() {
     if (type === "time") {
       input.dataset.appointmentTime = "true";
       input.title =
-        "Choose a time from the list. Mon–Fri 1:00–8:00 PM; Sat–Sun 10:00 AM–6:00 PM.";
+        "Choose a time from the list.";
       input.disabled = true;
       resetAppointmentTimeSelect(input);
       const hint = document.createElement("span");
       hint.className = "field-hint";
       hint.dataset.timeWindow = "true";
       hint.textContent =
-        "Select a date first, then choose a time. Mon–Fri 1:00–8:00 PM; Sat–Sun 10:00 AM–6:00 PM.";
+        "Select a date first, then choose a time.";
       field.appendChild(input);
       field.appendChild(hint);
     } else if (type === "date") {
-      input.min = maxISODate(todayLocalISO(), APPOINTMENTS_OPEN_ISO);
+      const today = todayLocalISO();
+      input.min = nextAvailableAppointmentStartOnOrAfter(today) || today;
+      input.max = APPOINTMENT_WINDOWS[APPOINTMENT_WINDOWS.length - 1]?.end || "";
       input.title = "Open the calendar to choose your appointment day";
       input.setAttribute("aria-label", `${formatLabel(header)} — use the calendar to pick a day`);
       const hint = document.createElement("span");
@@ -479,15 +507,22 @@ async function syncAppointmentTimeWindow() {
     timeInput.disabled = true;
     if (hint) {
       hint.textContent =
-        "Select a date first, then choose a time. Mon–Fri 1:00–8:00 PM; Sat–Sun 10:00 AM–6:00 PM.";
+        "Select a date first, then choose a time.";
     }
     return;
   }
 
-  if (isISODateBefore(iso, APPOINTMENTS_OPEN_ISO)) {
+  if (isISODateBefore(iso, APPOINTMENT_WINDOWS[0]?.start || "")) {
     resetAppointmentTimeSelect(timeInput);
     timeInput.disabled = true;
     if (hint) hint.textContent = collegeAvailabilityMessage();
+    return;
+  }
+
+  if (!isISODateWithinAnyWindow(iso)) {
+    resetAppointmentTimeSelect(timeInput);
+    timeInput.disabled = true;
+    if (hint) hint.textContent = "No appointments available on that date. Please choose another day.";
     return;
   }
 
@@ -691,8 +726,13 @@ function wireSchedulingForm() {
         status.textContent = "Please choose an appointment date.";
         return;
       }
-      if (isISODateBefore(dateInput.value, APPOINTMENTS_OPEN_ISO)) {
+      if (isISODateBefore(dateInput.value, APPOINTMENT_WINDOWS[0]?.start || "")) {
         status.textContent = collegeAvailabilityMessage();
+        dateInput.focus();
+        return;
+      }
+      if (!isISODateWithinAnyWindow(dateInput.value)) {
+        status.textContent = "No appointments are available on that date. Please choose another day.";
         dateInput.focus();
         return;
       }
