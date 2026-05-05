@@ -114,6 +114,60 @@
       });
   }
 
+  function renderAllAppointmentsPage({ items, page, pageSize, total }) {
+    const list = $("#admin-appointments-all-list");
+    const pageEl = $("#admin-appointments-page");
+    const prevBtn = $("#admin-appointments-prev");
+    const nextBtn = $("#admin-appointments-next");
+
+    list.innerHTML = "";
+    const totalNum = Number(total || 0);
+    const pageNum = Number(page || 1);
+    const sizeNum = Number(pageSize || 5);
+    const totalPages = Math.max(1, Math.ceil(totalNum / Math.max(1, sizeNum)));
+
+    pageEl.textContent = `Page ${pageNum} of ${totalPages} (${totalNum} total)`;
+    prevBtn.disabled = pageNum <= 1;
+    nextBtn.disabled = pageNum >= totalPages;
+
+    if (!Array.isArray(items) || items.length === 0) {
+      list.innerHTML = '<div class="review-card"><div class="review-text">No appointments found.</div></div>';
+      return;
+    }
+
+    // Reuse the same card format as the date-scoped list.
+    function formatTime12Hour(hhmm) {
+      const [h, m] = String(hhmm || "").split(":").map(Number);
+      if (!Number.isFinite(h) || !Number.isFinite(m)) return String(hhmm || "");
+      const d = new Date(2000, 0, 1, h, m, 0, 0);
+      return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: true });
+    }
+
+    function formatDateMDY(isoDate) {
+      const m = /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(String(isoDate || "").trim());
+      if (!m) return String(isoDate || "");
+      return `${m[2]}-${m[3]}-${m[1]}`;
+    }
+
+    items.forEach((a) => {
+      const firstName = String(a.clientFirstName || "").trim();
+      const lastName = String(a.clientLastName || "").trim();
+      const customerName = [firstName, lastName].filter(Boolean).join(" ") || "N/A";
+      const card = document.createElement("div");
+      card.className = "review-card";
+      card.innerHTML = `
+        <div class="review-meta">
+          <div class="review-name">${formatDateMDY(a.isoDate)} ${formatTime12Hour(a.time)} - ${escapeHtml(customerName)}</div>
+          <button class="btn admin-cancel-btn" type="button" data-id="${a.id}">Cancel</button>
+        </div>
+        <div class="review-text">
+          Phone: ${escapeHtml(a.clientPhone || "N/A")}
+        </div>
+      `;
+      list.appendChild(card);
+    });
+  }
+
   function renderOverrides(items) {
     const list = $("#admin-overrides-list");
     list.innerHTML = "";
@@ -177,6 +231,45 @@
     }
   }
 
+  function renderUpcomingAppointments(items) {
+    const list = $("#admin-upcoming-appointments");
+    if (!list) return;
+    list.innerHTML = "";
+    if (!Array.isArray(items) || items.length === 0) {
+      list.innerHTML = '<div class="review-card"><div class="review-text">No upcoming appointments.</div></div>';
+      return;
+    }
+
+    function formatTime12Hour(hhmm) {
+      const [h, m] = String(hhmm || "").split(":").map(Number);
+      if (!Number.isFinite(h) || !Number.isFinite(m)) return String(hhmm || "");
+      const d = new Date(2000, 0, 1, h, m, 0, 0);
+      return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: true });
+    }
+
+    function formatDateMDY(isoDate) {
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(isoDate || "").trim());
+      if (!m) return String(isoDate || "");
+      return `${m[2]}-${m[3]}-${m[1]}`;
+    }
+
+    items.forEach((a) => {
+      const firstName = String(a.clientFirstName || "").trim();
+      const lastName = String(a.clientLastName || "").trim();
+      const customerName = [firstName, lastName].filter(Boolean).join(" ") || "N/A";
+      const card = document.createElement("div");
+      card.className = "review-card";
+      card.innerHTML = `
+        <div class="review-meta">
+          <div class="review-name">${formatDateMDY(a.isoDate)} ${formatTime12Hour(a.time)} - ${escapeHtml(customerName)}</div>
+          <button class="btn admin-cancel-btn" type="button" data-id="${a.id}">Cancel</button>
+        </div>
+        <div class="review-text">Phone: ${escapeHtml(a.clientPhone || "N/A")}</div>
+      `;
+      list.appendChild(card);
+    });
+  }
+
   async function loadSchedule() {
     const date = $("#admin-date").value;
     if (!date) {
@@ -188,13 +281,55 @@
       const data = await apiFetch(`/api/admin/appointments?date=${encodeURIComponent(date)}`);
       renderAppointments(data.reservations || []);
       renderOverrides(data.overrides || []);
-      setStatus(`Loaded ${date}.`);
+      setStatus(`Loaded service day ${date}.`);
     } catch (err) {
       if (err.status === 401) {
         setToken("");
         dashboardVisible(false);
       }
       setStatus(err.message || "Failed to load schedule.");
+    }
+  }
+
+  const ALL_APPT_PAGE_SIZE = 5;
+  let allApptPage = 1;
+  let allApptQuery = "";
+  let allApptTotalPages = 1;
+
+  async function loadUpcomingAppointments() {
+    try {
+      const data = await apiFetch("/api/admin/appointments/upcoming?limit=3");
+      renderUpcomingAppointments(data.appointments || []);
+    } catch {
+      // Keep the main admin experience working even if this endpoint isn't deployed yet.
+      renderUpcomingAppointments([]);
+    }
+  }
+
+  async function loadAllAppointments({ page } = {}) {
+    const targetPage = Number.isFinite(Number(page)) ? Number(page) : allApptPage;
+    allApptPage = Math.max(1, Math.floor(targetPage));
+    setStatus("Loading appointments...");
+    try {
+      const data = await apiFetch(
+        `/api/admin/appointments/list?q=${encodeURIComponent(allApptQuery)}&page=${encodeURIComponent(
+          allApptPage,
+        )}&pageSize=${encodeURIComponent(ALL_APPT_PAGE_SIZE)}`,
+      );
+      const total = Number(data.total || 0);
+      allApptTotalPages = Math.max(1, Math.ceil(total / ALL_APPT_PAGE_SIZE));
+      renderAllAppointmentsPage({
+        items: data.appointments || [],
+        page: data.page || allApptPage,
+        pageSize: data.pageSize || ALL_APPT_PAGE_SIZE,
+        total,
+      });
+      setStatus("Appointments loaded.");
+    } catch (err) {
+      renderAllAppointmentsPage({ items: [], page: allApptPage, pageSize: ALL_APPT_PAGE_SIZE, total: 0 });
+      // If the Worker hasn't been deployed with the list endpoint yet, avoid a confusing "Not found." status.
+      if (err && err.status === 404) setStatus("");
+      else setStatus(err.message || "Failed to load appointments.");
     }
   }
 
@@ -213,7 +348,7 @@
         setToken(data.token || "");
         status.textContent = "Logged in.";
         dashboardVisible(true);
-        await loadSchedule();
+        await Promise.all([loadSchedule(), loadUpcomingAppointments(), loadAllAppointments({ page: 1 }), loadReviews()]);
       } catch (err) {
         status.textContent = err.message || "Login failed.";
       }
@@ -222,6 +357,23 @@
 
   function wireAdminActions() {
     $("#admin-refresh-btn").addEventListener("click", loadSchedule);
+    const apptRefreshBtn = $("#admin-appointments-refresh-btn");
+    if (apptRefreshBtn) apptRefreshBtn.addEventListener("click", () => loadAllAppointments({ page: 1 }));
+
+    const apptSearch = $("#admin-appointments-search");
+    let searchTimer = null;
+    if (apptSearch) {
+      apptSearch.addEventListener("input", () => {
+        window.clearTimeout(searchTimer);
+        searchTimer = window.setTimeout(() => {
+          allApptQuery = String(apptSearch.value || "").trim();
+          loadAllAppointments({ page: 1 });
+        }, 250);
+      });
+    }
+
+    $("#admin-appointments-prev").addEventListener("click", () => loadAllAppointments({ page: allApptPage - 1 }));
+    $("#admin-appointments-next").addEventListener("click", () => loadAllAppointments({ page: allApptPage + 1 }));
     const refreshReviewsBtn = $("#admin-reviews-refresh-btn");
     if (refreshReviewsBtn) refreshReviewsBtn.addEventListener("click", loadReviews);
     $("#admin-logout-btn").addEventListener("click", () => {
@@ -230,7 +382,7 @@
       setStatus("Logged out.");
     });
 
-    $("#admin-appointments-list").addEventListener("click", async (e) => {
+    document.addEventListener("click", async (e) => {
       const btn = e.target.closest(".admin-cancel-btn");
       if (!btn) return;
       const id = btn.getAttribute("data-id");
@@ -238,7 +390,7 @@
       setStatus("Canceling appointment...");
       try {
         await apiFetch(`/api/admin/appointments/${encodeURIComponent(id)}`, { method: "DELETE" });
-        await loadSchedule();
+        await Promise.all([loadSchedule(), loadUpcomingAppointments(), loadAllAppointments({ page: allApptPage })]);
         setStatus("Appointment canceled.");
       } catch (err) {
         setStatus(err.message || "Cancel failed.");
@@ -326,6 +478,8 @@
     if (getToken()) {
       dashboardVisible(true);
       loadSchedule();
+      loadUpcomingAppointments();
+      loadAllAppointments({ page: 1 });
       loadReviews();
     }
   }

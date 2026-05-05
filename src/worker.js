@@ -476,6 +476,90 @@ async function handleAdminAppointments(req, env) {
   return json({ ok: false, error: "Method not allowed." }, { status: 405 });
 }
 
+async function handleAdminAppointmentsList(req, env) {
+  const auth = await requireAdmin(req, env);
+  if (!auth.ok) return auth.response;
+  if (!env.SCHEDULING) return json({ ok: false, error: "SCHEDULING binding is not configured." }, { status: 500 });
+  if (req.method !== "GET") return json({ ok: false, error: "Method not allowed." }, { status: 405 });
+
+  const url = new URL(req.url);
+  const qRaw = String(url.searchParams.get("q") || "").trim();
+  const page = Number(url.searchParams.get("page") || "1");
+  const pageSize = Number(url.searchParams.get("pageSize") || "5");
+
+  const safePage = Number.isFinite(page) && page >= 1 ? Math.floor(page) : 1;
+  const safePageSize =
+    Number.isFinite(pageSize) && pageSize >= 1 && pageSize <= 50 ? Math.floor(pageSize) : 5;
+  const offset = (safePage - 1) * safePageSize;
+
+  const q = clampStr(qRaw, 80);
+  const hasQ = Boolean(q);
+  const like = `%${q.toLowerCase()}%`;
+
+  const where = hasQ
+    ? `WHERE lower(coalesce(clientFirstName,'')) LIKE ?
+        OR lower(coalesce(clientLastName,'')) LIKE ?
+        OR lower(trim(coalesce(clientFirstName,'') || ' ' || coalesce(clientLastName,''))) LIKE ?`
+    : "";
+
+  const countStmt = env.SCHEDULING.prepare(
+    `SELECT COUNT(*) AS total
+     FROM appointment_reservations
+     ${where}`,
+  );
+
+  const listStmt = env.SCHEDULING.prepare(
+    `SELECT id, isoDate, time, createdAt, clientFirstName, clientLastName, clientPhone, clientEmail, notes
+     FROM appointment_reservations
+     ${where}
+     ORDER BY isoDate ASC, time ASC, id ASC
+     LIMIT ? OFFSET ?`,
+  );
+
+  const bindArgs = hasQ ? [like, like, like] : [];
+  const countRes = await countStmt.bind(...bindArgs).first();
+  const total = Number(countRes?.total || 0);
+
+  const { results } = await listStmt.bind(...bindArgs, safePageSize, offset).all();
+  return json(
+    {
+      ok: true,
+      q,
+      page: safePage,
+      pageSize: safePageSize,
+      total,
+      appointments: results || [],
+    },
+    { status: 200 },
+  );
+}
+
+async function handleAdminUpcomingAppointments(req, env) {
+  const auth = await requireAdmin(req, env);
+  if (!auth.ok) return auth.response;
+  if (!env.SCHEDULING) return json({ ok: false, error: "SCHEDULING binding is not configured." }, { status: 500 });
+  if (req.method !== "GET") return json({ ok: false, error: "Method not allowed." }, { status: 405 });
+
+  const url = new URL(req.url);
+  const limitRaw = Number(url.searchParams.get("limit") || "3");
+  const limit = Number.isFinite(limitRaw) && limitRaw >= 1 && limitRaw <= 20 ? Math.floor(limitRaw) : 3;
+
+  // Use local-date style ISO string (YYYY-MM-DD). This is good enough for "upcoming" ordering.
+  const todayIso = new Date().toISOString().slice(0, 10);
+
+  const { results } = await env.SCHEDULING.prepare(
+    `SELECT id, isoDate, time, createdAt, clientFirstName, clientLastName, clientPhone, clientEmail, notes
+     FROM appointment_reservations
+     WHERE isoDate >= ?
+     ORDER BY isoDate ASC, time ASC, id ASC
+     LIMIT ?`,
+  )
+    .bind(todayIso, limit)
+    .all();
+
+  return json({ ok: true, todayIso, appointments: results || [] }, { status: 200 });
+}
+
 async function handleAdminCancel(req, env, id) {
   const auth = await requireAdmin(req, env);
   if (!auth.ok) return auth.response;
@@ -557,6 +641,8 @@ export default {
       else if (path === "/api/appointments/booked" && req.method === "GET") res = await handleBooked(req, env);
       else if (path === "/api/appointments/reserve") res = await handleReserve(req, env);
       else if (path === "/api/admin/login") res = await handleAdminLogin(req, env);
+      else if (path === "/api/admin/appointments/list") res = await handleAdminAppointmentsList(req, env);
+      else if (path === "/api/admin/appointments/upcoming") res = await handleAdminUpcomingAppointments(req, env);
       else if (path === "/api/admin/appointments") res = await handleAdminAppointments(req, env);
       else if (cancelMatch) res = await handleAdminCancel(req, env, cancelMatch[1]);
       else if (path === "/api/admin/availability") res = await handleAdminAvailability(req, env);
