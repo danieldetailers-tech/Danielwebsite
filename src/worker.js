@@ -6,6 +6,11 @@ function json(data, init = {}) {
 
 const ADMIN_TOKEN_TTL_MS = 1000 * 60 * 60 * 12; // 12 hours
 
+function assertEnvString(env, key) {
+  const v = String(env?.[key] ?? "").trim();
+  return v ? v : null;
+}
+
 function withCors(req, res, { allowOrigin } = {}) {
   const origin = req.headers.get("Origin");
   const headers = new Headers(res.headers);
@@ -80,6 +85,128 @@ function fromBase64Url(base64url) {
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
   return bytes;
+}
+
+function pemToDerBytes(pem) {
+  const text = String(pem || "").trim();
+  const body = text
+    .replace(/-----BEGIN ([A-Z ]+)-----/g, "")
+    .replace(/-----END ([A-Z ]+)-----/g, "")
+    .replace(/\s+/g, "");
+  const binary = atob(body);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+async function googleServiceAccountAccessToken(env, { scope }) {
+  const serviceAccountEmail = assertEnvString(env, "GOOGLE_SERVICE_ACCOUNT_EMAIL");
+  let privateKeyPem = assertEnvString(env, "GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY");
+  if (privateKeyPem) privateKeyPem = privateKeyPem.replace(/\\n/g, "\n");
+  if (!serviceAccountEmail || !privateKeyPem) return { ok: false, error: "Google service account is not configured." };
+
+  const tokenUrl = "https://oauth2.googleapis.com/token";
+  const now = Math.floor(Date.now() / 1000);
+
+  const header = { alg: "RS256", typ: "JWT" };
+  const claimSet = {
+    iss: serviceAccountEmail,
+    scope,
+    aud: tokenUrl,
+    iat: now,
+    exp: now + 60 * 60,
+  };
+
+  const unsignedJwt = `${toBase64Url(JSON.stringify(header))}.${toBase64Url(JSON.stringify(claimSet))}`;
+  const pkcs8Der = pemToDerBytes(privateKeyPem);
+  const key = await crypto.subtle.importKey(
+    "pkcs8",
+    pkcs8Der,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sigBuf = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(unsignedJwt));
+  const signedJwt = `${unsignedJwt}.${toBase64Url(new Uint8Array(sigBuf))}`;
+
+  const body = new URLSearchParams();
+  body.set("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer");
+  body.set("assertion", signedJwt);
+
+  const res = await fetch(tokenUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    console.error("Google OAuth token error:", res.status, txt);
+    return { ok: false, error: "Failed to authenticate to Google Calendar." };
+  }
+  const data = await res.json().catch(() => null);
+  const accessToken = String(data?.access_token || "").trim();
+  if (!accessToken) return { ok: false, error: "Google OAuth token response missing access_token." };
+  return { ok: true, accessToken };
+}
+
+function addMinutesToHHMM(hhmm, minutesToAdd) {
+  const [h, m] = String(hhmm || "").split(":").map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+  const total = h * 60 + m + Number(minutesToAdd || 0);
+  const hh = Math.floor(total / 60);
+  const mm = total % 60;
+  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+}
+
+async function createGoogleCalendarEventForReservation(env, reservation) {
+  const calendarId = assertEnvString(env, "GOOGLE_CALENDAR_ID");
+  if (!calendarId) return { ok: false, error: "Google Calendar ID is not configured." };
+
+  const timeZone = assertEnvString(env, "GOOGLE_CALENDAR_TIME_ZONE") || "America/Los_Angeles";
+  const durationMins = Number(env?.APPOINTMENT_DURATION_MINUTES || 240);
+  const endTime = addMinutesToHHMM(reservation.time, durationMins) || reservation.time;
+
+  const startLocal = `${reservation.isoDate}T${reservation.time}:00`;
+  const endLocal = `${reservation.isoDate}T${endTime}:00`;
+
+  const name = [reservation.clientFirstName, reservation.clientLastName].filter(Boolean).join(" ").trim();
+  const title = name ? `Detailing — ${name}` : "Detailing appointment";
+  const descriptionLines = [
+    "Daniel’s Detailers appointment",
+    reservation.clientPhone ? `Phone: ${reservation.clientPhone}` : null,
+    reservation.clientEmail ? `Email: ${reservation.clientEmail}` : null,
+    reservation.notes ? `Notes: ${reservation.notes}` : null,
+    reservation.id ? `Reservation ID: ${reservation.id}` : null,
+  ].filter(Boolean);
+
+  const token = await googleServiceAccountAccessToken(env, { scope: "https://www.googleapis.com/auth/calendar.events" });
+  if (!token.ok) return token;
+
+  const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`;
+  const payload = {
+    summary: title,
+    description: descriptionLines.join("\n"),
+    start: { dateTime: startLocal, timeZone },
+    end: { dateTime: endLocal, timeZone },
+  };
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token.accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    console.error("Google Calendar insert error:", res.status, txt);
+    return { ok: false, error: "Failed to create Google Calendar event." };
+  }
+  const data = await res.json().catch(() => null);
+  const eventId = String(data?.id || "").trim() || null;
+  const htmlLink = String(data?.htmlLink || "").trim() || null;
+  return { ok: true, eventId, htmlLink };
 }
 
 async function hmacSign(message, secret) {
@@ -215,7 +342,42 @@ async function handleReserve(req, env) {
       .bind(isoDate, time, createdAt, clientFirstName, clientLastName, clientPhone, clientEmail, notes)
       .run();
     const id = Number(info?.meta?.last_row_id ?? 0);
-    return json({ ok: true, reservation: { id, isoDate, time, createdAt } }, { status: 201 });
+
+    // Best-effort: create a Google Calendar event. Reservation should still succeed even if Calendar fails.
+    let googleEventId = null;
+    let googleEventLink = null;
+    const gcal = await createGoogleCalendarEventForReservation(env, {
+      id,
+      isoDate,
+      time,
+      clientFirstName,
+      clientLastName,
+      clientPhone,
+      clientEmail,
+      notes,
+    });
+    if (gcal.ok) {
+      googleEventId = gcal.eventId || null;
+      googleEventLink = gcal.htmlLink || null;
+      try {
+        await env.SCHEDULING.prepare(
+          `UPDATE appointment_reservations
+           SET googleEventId = ?, googleEventLink = ?
+           WHERE id = ?`,
+        )
+          .bind(googleEventId, googleEventLink, id)
+          .run();
+      } catch (e) {
+        console.error("Failed to persist Google Calendar event metadata:", e);
+      }
+    } else {
+      console.error("Google Calendar event creation failed (reservation still saved):", gcal.error);
+    }
+
+    return json(
+      { ok: true, reservation: { id, isoDate, time, createdAt, googleEventId, googleEventLink } },
+      { status: 201 },
+    );
   } catch (e) {
     if (isUniqueConstraintError(e)) {
       return json({ ok: false, error: "That time slot has already been booked. Please pick another time." }, { status: 409 });
