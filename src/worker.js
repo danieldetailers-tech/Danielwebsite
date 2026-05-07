@@ -172,7 +172,7 @@ async function createGoogleCalendarEventForReservation(env, reservation) {
   const name = [reservation.clientFirstName, reservation.clientLastName].filter(Boolean).join(" ").trim();
   const title = name ? `Detailing — ${name}` : "Detailing appointment";
   const descriptionLines = [
-    "Daniel’s Detailers appointment",
+    "Detailing by Daniel appointment",
     reservation.clientPhone ? `Phone: ${reservation.clientPhone}` : null,
     reservation.clientEmail ? `Email: ${reservation.clientEmail}` : null,
     reservation.notes ? `Notes: ${reservation.notes}` : null,

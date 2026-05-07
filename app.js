@@ -95,7 +95,7 @@ function formatDateMDY(isoYmd) {
 }
 
 function buildAppointmentEmail(record) {
-  const subject = "New Appointment Request — Daniel’s Detailers";
+  const subject = "New Appointment Request — Detailing by Daniel";
   const lines = Object.entries(record).map(([k, v]) => {
     if (normalizeHeader(k) === "appointment time") return `${k}: ${formatTime12Hour(v)}`;
     if (normalizeHeader(k) === "appointment date") return `${k}: ${formatDateMDY(v)}`;

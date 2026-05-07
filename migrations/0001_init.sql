@@ -1,4 +1,4 @@
--- Cloudflare D1 schema for Daniel’s Detailers
+-- Cloudflare D1 schema for Detailing by Daniel
 
 CREATE TABLE IF NOT EXISTS reviews (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

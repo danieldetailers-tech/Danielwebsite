@@ -1,7 +1,7 @@
 {
   "name": "daniels-detailing-business",
   "version": "1.0.0",
-  "description": "Daniel’s Detailers website",
+  "description": "Detailing by Daniel website",
   "private": true,
   "scripts": {
     "build": "node -e \"console.log('Static site (no build step)')\"",

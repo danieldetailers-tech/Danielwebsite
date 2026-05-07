@@ -1,4 +1,4 @@
-# Daniel's Detailers - Coder Instructions
+# Detailing by Daniel - Coder Instructions
 
 This document explains how to safely update this project, including:
 
