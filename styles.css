@@ -356,6 +356,74 @@ input[type="date"]::-webkit-calendar-picker-indicator{
   opacity: 0.9;
 }
 
+/* Flatpickr date picker tweaks to match the site and make disabled days obvious (gray). */
+.flatpickr-calendar{
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.22);
+  font-size: 15px;
+}
+.flatpickr-calendar.open{
+  width: auto;
+  display: inline-block;
+}
+.flatpickr-rContainer,
+.flatpickr-weekdays,
+.dayContainer{
+  width: 308px; /* 7 * 44px */
+}
+.flatpickr-days{
+  width: 308px;
+}
+.flatpickr-months{
+  align-items: center;
+}
+.flatpickr-months .flatpickr-month{
+  height: 40px;
+}
+.flatpickr-current-month{
+  font-size: 15px;
+  line-height: 40px;
+  padding: 0 36px; /* room for prev/next arrows */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.flatpickr-current-month .flatpickr-monthDropdown-months{
+  font-weight: 700;
+}
+.flatpickr-current-month .numInputWrapper{
+  width: 5.2em;
+}
+.flatpickr-current-month .numInputWrapper input{
+  font-weight: 700;
+}
+.flatpickr-prev-month,
+.flatpickr-next-month{
+  top: 4px;
+}
+.flatpickr-day{
+  height: 40px;
+  line-height: 40px;
+  max-width: 44px;
+}
+.flatpickr-day.prevMonthDay,
+.flatpickr-day.nextMonthDay{
+  opacity: 0;
+  pointer-events: none;
+}
+.flatpickr-weekday{
+  font-size: 12px;
+}
+.flatpickr-day.flatpickr-disabled,
+.flatpickr-day.flatpickr-disabled:hover{
+  color: rgba(17,24,39,0.30);
+  background: rgba(17,24,39,0.06);
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
 input, textarea, select, input.phone-us-input{
   width: 100%;
   background: rgba(255,255,255,0.92);

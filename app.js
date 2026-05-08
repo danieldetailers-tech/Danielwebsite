@@ -115,6 +115,15 @@ function todayLocalISO() {
   return `${y}-${m}-${day}`;
 }
 
+function localDateToISO(dateObj) {
+  const d = dateObj instanceof Date ? dateObj : new Date(dateObj);
+  if (Number.isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function maxISODate(a, b) {
   const aa = String(a || "").trim();
   const bb = String(b || "").trim();
@@ -443,6 +452,10 @@ function buildSchedulingForm() {
       // Native <input type="time"> often shows a minute-by-minute wheel; a <select>
       // lists only :00 / :15 / :30 / :45 so mobile pickers stay on 15-minute steps.
       input = document.createElement("select");
+    } else if (type === "date") {
+      // Use a text input so Flatpickr can gray out unavailable days.
+      input = document.createElement("input");
+      input.type = "text";
     } else {
       input = document.createElement("input");
       input.type = type;
@@ -470,6 +483,8 @@ function buildSchedulingForm() {
       input.max = APPOINTMENT_WINDOWS[APPOINTMENT_WINDOWS.length - 1]?.end || "";
       input.title = "Open the calendar to choose your appointment day";
       input.setAttribute("aria-label", `${formatLabel(header)} — use the calendar to pick a day`);
+      input.dataset.appointmentDate = "true";
+      input.readOnly = true;
       const hint = document.createElement("span");
       hint.className = "field-hint";
       hint.textContent = `${collegeAvailabilityMessage()} Click the field or calendar icon to choose a day.`;
@@ -495,7 +510,7 @@ function buildSchedulingForm() {
 async function syncAppointmentTimeWindow() {
   const form = $("#schedule-form");
   if (!form) return;
-  const dateInput = form.querySelector('input[type="date"]');
+  const dateInput = form.querySelector('[data-appointment-date="true"], input[type="date"]');
   const timeInput = form.querySelector('[data-appointment-time="true"]');
   if (!timeInput) return;
 
@@ -579,12 +594,44 @@ async function syncAppointmentTimeWindow() {
 function wireAppointmentAvailability() {
   const form = $("#schedule-form");
   if (!form) return;
-  const dateInput = form.querySelector('input[type="date"]');
+  const dateInput = form.querySelector('[data-appointment-date="true"], input[type="date"]');
   if (dateInput) {
     dateInput.addEventListener("change", () => syncAppointmentTimeWindow());
     dateInput.addEventListener("input", () => syncAppointmentTimeWindow());
   }
   syncAppointmentTimeWindow();
+}
+
+function initAppointmentDatePicker() {
+  if (!window.flatpickr) return;
+  const form = $("#schedule-form");
+  if (!form) return;
+  const dateInput = form.querySelector('[data-appointment-date="true"]');
+  if (!dateInput) return;
+  if (dateInput._flatpickr) return;
+
+  const today = todayLocalISO();
+  const minDate = nextAvailableAppointmentStartOnOrAfter(today) || today;
+  const maxDate = APPOINTMENT_WINDOWS[APPOINTMENT_WINDOWS.length - 1]?.end || null;
+
+  window.flatpickr(dateInput, {
+    dateFormat: "Y-m-d",
+    disableMobile: true,
+    minDate,
+    maxDate,
+    disable: [
+      (d) => {
+        const iso = localDateToISO(d);
+        if (!iso) return true;
+        if (!isISODateWithinAnyWindow(iso)) return true;
+        const slots = getAllowedAppointmentSlotsForISODate(iso);
+        return Array.isArray(slots) && slots.length === 0;
+      },
+    ],
+    onChange: () => {
+      syncAppointmentTimeWindow();
+    },
+  });
 }
 
 function wirePhoneMasks() {
@@ -891,6 +938,7 @@ async function init() {
   wireTabs();
   initEmailJsIfConfigured();
   buildSchedulingForm();
+  initAppointmentDatePicker();
   wirePhoneMasks();
   wireAppointmentAvailability();
   wireSchedulingForm();
