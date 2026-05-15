@@ -201,8 +201,9 @@ function getAllowedAppointmentSlotsForISODate(iso) {
   // Block off Monday (1) and Tuesday (2) entirely.
   if (dow === 1 || dow === 2) return [];
 
-  // Wednesday (3) through Friday (5): only 1:00 PM and 6:00 PM.
-  if (dow >= 3 && dow <= 5) return ["13:00", "18:00"];
+  // Wednesday (3): 6:00 PM only. Thursday–Friday (4–5): 1:00 PM and 6:00 PM.
+  if (dow === 3) return ["18:00"];
+  if (dow >= 4 && dow <= 5) return ["13:00", "18:00"];
 
   // Sunday: no appointments.
   if (dow === 0) return [];
@@ -584,7 +585,8 @@ async function syncAppointmentTimeWindow() {
   const weekend = dow != null && [0, 6].includes(dow);
   if (hint) {
     if (dow === 1 || dow === 2) hint.textContent = "No appointments available Monday–Tuesday.";
-    else if (dow != null && dow >= 3 && dow <= 5) hint.textContent = "Wed–Fri: 1:00 PM or 6:00 PM.";
+    else if (dow === 3) hint.textContent = "Wednesday: 6:00 PM only.";
+    else if (dow === 4 || dow === 5) hint.textContent = "Thu–Fri: 1:00 PM or 6:00 PM.";
     else if (dow === 6) hint.textContent = "Saturday: 10:00 AM, 2:30 PM, or 6:00 PM.";
     else if (dow === 0) hint.textContent = "No appointments available on Sunday.";
     else hint.textContent = "Choose a valid appointment date.";
@@ -796,7 +798,8 @@ function wireSchedulingForm() {
         const dt = parseISODateLocal(dateInput.value);
         const dow = dt ? dt.getDay() : null;
         if (dow === 1 || dow === 2) status.textContent = "No appointments are available on Monday or Tuesday.";
-        else if (dow != null && dow >= 3 && dow <= 5) status.textContent = "Please choose 1:00 PM or 6:00 PM (Wed–Fri).";
+        else if (dow === 3) status.textContent = "Please choose 6:00 PM (Wednesday).";
+        else if (dow === 4 || dow === 5) status.textContent = "Please choose 1:00 PM or 6:00 PM (Thu–Fri).";
         else if (dow === 6) status.textContent = "Please choose 10:00 AM, 2:30 PM, or 6:00 PM (Saturday).";
         else if (dow === 0) status.textContent = "No appointments are available on Sunday.";
         else status.textContent = "Please choose a valid appointment date/time.";
